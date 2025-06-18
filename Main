@@ -1,0 +1,90 @@
+// === IR Sensor Pins ===
+#define S1 A0
+#define S2 A1
+#define S3 A2
+#define S4 A3
+#define S5 A4
+
+// === Motor Driver Pins ===
+#define ENA 6
+#define ENB 11
+#define IN1 7
+#define IN2 8
+#define IN3 9
+#define IN4 10
+
+// === PID Variables ===
+float Kp = 30;    // Proportional gain
+float Ki = 0.0;   // Integral gain
+float Kd = 12;    // Derivative gain
+
+int baseSpeed = 150; // Base motor speed (0–255)
+
+float error = 0, previousError = 0, integral = 0;
+
+// === Setup ===
+void setup() {
+  pinMode(S1, INPUT);
+  pinMode(S2, INPUT);
+  pinMode(S3, INPUT);
+  pinMode(S4, INPUT);
+  pinMode(S5, INPUT);
+
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  // Enable Serial for debugging (optional)
+  Serial.begin(9600);
+}
+
+// === Main Loop ===
+void loop() {
+  int sensors[5] = {
+    digitalRead(S1),
+    digitalRead(S2),
+    digitalRead(S3),
+    digitalRead(S4),
+    digitalRead(S5)
+  };
+
+  int weights[5] = {-2, -1, 0, 1, 2};
+  int weightedSum = 0, activeSensors = 0;
+
+  // Calculate weighted position
+  for (int i = 0; i < 5; i++) {
+    if (sensors[i] == 0) { // 0 = black line detected
+      weightedSum += weights[i];
+      activeSensors++;
+    }
+  }
+
+  float position = (activeSensors > 0) ? (float)weightedSum / activeSensors : 0;
+
+  // === PID Computation ===
+  error = position;
+  integral += error;
+  float derivative = error - previousError;
+
+  float correction = (Kp * error) + (Ki * integral) + (Kd * derivative);
+
+  int leftSpeed = constrain(baseSpeed + correction, 0, 255);
+  int rightSpeed = constrain(baseSpeed - correction, 0, 255);
+
+  moveForward(leftSpeed, rightSpeed);
+
+  previousError = error;
+  delay(10);
+}
+
+// === Motor Control ===
+void moveForward(int left, int right) {
+  analogWrite(ENA, left);
+  analogWrite(ENB, right);
+
+  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);  // Left motor forward
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);  // Right motor forward
+}
